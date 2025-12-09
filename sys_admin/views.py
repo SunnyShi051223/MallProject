@@ -213,3 +213,73 @@ def product_delete():
             return jsonify({'code': 400, 'msg': '删除失败或商品不存在'})
     except Exception as e:
         return jsonify({'code': 500, 'msg': str(e)})
+
+
+# =======================
+# 4. 营销管理 (优惠券)
+# =======================
+
+@sys_bp.route('/coupon/list')
+def coupon_list():
+    """优惠券列表"""
+    # 按结束时间倒序排列
+    sql = "SELECT * FROM sms_coupon ORDER BY end_time DESC"
+    coupons = db.fetch_all(sql)
+    return render_template('admin_coupon_list.html', coupons=coupons)
+
+
+# ... (前面的代码保持不变)
+
+@sys_bp.route('/coupon/add', methods=['GET', 'POST'])
+def coupon_add():
+    """发布新优惠券"""
+    if request.method == 'GET':
+        return render_template('admin_coupon_add.html')
+
+    # 处理提交
+    try:
+        name = request.form.get('name')
+        amount = float(request.form.get('amount'))
+        min_point = float(request.form.get('min_point'))
+        publish_count = int(request.form.get('publish_count'))
+
+        # 获取并格式化时间
+        start_time_str = request.form.get('start_time')
+        end_time_str = request.form.get('end_time')
+
+        # [新增] 时间逻辑校验
+        if start_time_str >= end_time_str:
+            flash("发布失败：结束时间必须晚于开始时间！", "danger")
+            return redirect(url_for('sys_admin.coupon_add'))
+
+        # 格式化适配 MySQL (把 HTML 的 T 换成空格)
+        start_time = start_time_str.replace('T', ' ')
+        end_time = end_time_str.replace('T', ' ')
+
+        sql = """
+            INSERT INTO sms_coupon 
+            (name, amount, min_point, start_time, end_time, publish_count, receive_count, enable_status)
+            VALUES (%s, %s, %s, %s, %s, %s, 0, 1)
+        """
+        db.execute_update(sql, (name, amount, min_point, start_time, end_time, publish_count))
+
+        flash("优惠券发布成功！", "success")
+        return redirect(url_for('sys_admin.coupon_list'))
+
+    except Exception as e:
+        flash(f"发布失败: {str(e)}", "danger")
+        return redirect(url_for('sys_admin.coupon_add'))
+
+
+# ... (后面的代码保持不变)
+@sys_bp.route('/coupon/delete', methods=['POST'])
+def coupon_delete():
+    """删除优惠券"""
+    coupon_id = request.form.get('id')
+    # 注意：真实业务中，如果有人领过，通常是逻辑删除或无法删除。
+    # 这里为了演示方便，允许直接删除（需确保数据库有级联删除设置，或手动清理历史表）
+    try:
+        db.execute_update("DELETE FROM sms_coupon WHERE id=%s", (coupon_id,))
+        return jsonify({'code': 200, 'msg': '删除成功'})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': str(e)})

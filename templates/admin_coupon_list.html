@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-2 mb-3">
+        <div class="list-group">
+            <a href="/admin/" class="list-group-item list-group-item-action">控制台</a>
+            <a href="{{ url_for('sys_admin.product_list') }}" class="list-group-item list-group-item-action">商品管理</a>
+            <a href="{{ url_for('sys_admin.coupon_list') }}" class="list-group-item list-group-item-action active bg-dark border-0">优惠券管理</a>
+            <a href="{{ url_for('sys_admin.logout') }}" class="list-group-item list-group-item-action text-danger">退出登录</a>
+        </div>
+    </div>
+
+    <div class="col-md-10">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-ticket-perforated"></i> 优惠券列表</h5>
+                <a href="{{ url_for('sys_admin.coupon_add') }}" class="btn btn-sm btn-danger">
+                    <i class="bi bi-plus-lg"></i> 发布新券
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>名称</th>
+                            <th>面额/门槛</th>
+                            <th>领取进度</th>
+                            <th>有效期</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in coupons %}
+                        <tr>
+                            <td class="fw-bold">{{ c.name }}</td>
+                            <td>
+                                <span class="text-danger fw-bold">¥ {{ c.amount }}</span><br>
+                                <small class="text-muted">满 {{ c.min_point }} 用</small>
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 5px; width: 100px;">
+                                    {% set percent = (c.receive_count / c.publish_count * 100) | int %}
+                                    <div class="progress-bar bg-danger" style="width: {{ percent }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ c.receive_count }} / {{ c.publish_count }}</small>
+                            </td>
+                            <td>
+                                <small>起: {{ c.start_time }}</small><br>
+                                <small>止: {{ c.end_time }}</small>
+                            </td>
+                            <td>
+                                {% if c.receive_count >= c.publish_count %}
+                                    <span class="badge bg-secondary">已抢光</span>
+                                {% else %}
+                                    <span class="badge bg-success">进行中</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button onclick="delCoupon({{ c.id }})" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-center py-5">暂无优惠券</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function delCoupon(id) {
+        if(confirm("确定删除吗？")) {
+            $.post('/admin/coupon/delete', {id: id}, function(res){
+                if(res.code === 200) location.reload();
+                else alert(res.msg);
+            });
+        }
+    }
+</script>
+{% endblock %}

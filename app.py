@@ -13,7 +13,7 @@ from sys_admin.views import sys_bp
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# 注册蓝图 (URL前缀区分模块)
+# 注册蓝图
 app.register_blueprint(ums_bp, url_prefix='/ums')
 app.register_blueprint(pms_bp, url_prefix='/pms')
 app.register_blueprint(oms_bp, url_prefix='/oms')

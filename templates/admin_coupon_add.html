@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-gift"></i> 发布新优惠券</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">优惠券名称</label>
+                        <input type="text" name="name" class="form-control" placeholder="如：618大促满减券" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">面额 (减多少)</label>
+                            <input type="number" name="amount" class="form-control text-danger fw-bold" placeholder="10" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">门槛 (满多少)</label>
+                            <input type="number" name="min_point" class="form-control" placeholder="100" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">开始时间</label>
+                            <input type="datetime-local" name="start_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">结束时间</label>
+                            <input type="datetime-local" name="end_time" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">发行总量 (张)</label>
+                        <input type="number" name="publish_count" class="form-control" value="100" required>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg">立即发布</button>
+                        <a href="{{ url_for('sys_admin.coupon_list') }}" class="btn btn-outline-secondary">返回列表</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

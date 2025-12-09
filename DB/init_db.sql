@@ -417,3 +417,10 @@ CREATE TABLE `oms_order_return_apply` (
 ALTER TABLE oms_order_return_apply
 ADD CONSTRAINT fk_return_order
 FOREIGN KEY (order_id) REFERENCES oms_order(id);
+
+USE mall_b2c;
+
+-- 补全优惠券表的缺失字段
+ALTER TABLE sms_coupon
+ADD COLUMN `start_time` DATETIME DEFAULT NULL COMMENT '生效时间',
+ADD COLUMN `enable_status` INT DEFAULT 1 COMMENT '状态：0->下架；1->上架';
