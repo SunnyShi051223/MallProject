@@ -380,3 +380,50 @@ USE mall_b2c;
 -- 为后台管理员表补全状态字段
 ALTER TABLE sys_admin
 ADD COLUMN status INT DEFAULT 1 COMMENT '帐号状态: 0->禁用; 1->启用';
+
+ALTER TABLE sms_coupon ADD COLUMN start_time DATETIME DEFAULT NULL;
+ALTER TABLE sms_coupon ADD COLUMN enable_status INT DEFAULT 1;
+
+USE mall_b2c;
+
+-- ==========================================
+-- 1. 补全索引 (Index)
+-- ==========================================
+-- 提升商品搜索和订单查询速度
+CREATE INDEX idx_product_name ON pms_product(name);
+CREATE INDEX idx_order_sn ON oms_order(order_sn);
+
+-- ==========================================
+-- 2. 补全触发器 (Trigger)
+-- ==========================================
+-- 创建系统日志表
+CREATE TABLE IF NOT EXISTS sys_log (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  content VARCHAR(255),
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 创建触发器：订单完成时自动写日志
+DROP TRIGGER IF EXISTS t_order_complete_log;
+DELIMITER $$
+CREATE TRIGGER t_order_complete_log
+AFTER UPDATE ON oms_order
+FOR EACH ROW
+BEGIN
+    IF OLD.status <> 3 AND NEW.status = 3 THEN
+        INSERT INTO sys_log (content)
+        VALUES (CONCAT('系统自动记录：订单 ', NEW.order_sn, ' 交易完成。'));
+    END IF;
+END $$
+DELIMITER ;
+
+-- ==========================================
+-- 3. 补全自主存取控制 (DAC)
+-- ==========================================
+CREATE USER IF NOT EXISTS 'mall_app'@'%' IDENTIFIED BY 'App123!';
+GRANT SELECT, INSERT, UPDATE, DELETE ON mall_b2c.* TO 'mall_app'@'%';
+
+-- 创建数据分析师账号 (只读权限，且只能查视图)
+CREATE USER IF NOT EXISTS 'mall_analyst'@'%' IDENTIFIED BY 'Audit123!';
+GRANT SELECT ON mall_b2c.v_order_detail TO 'mall_analyst'@'%';
+

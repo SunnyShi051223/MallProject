@@ -13,28 +13,27 @@ db = DBHelper()
 
 @oms_bp.route('/cart')
 def view_cart():
-    """查看购物车 (含会员折扣展示)"""
+    """查看购物车 (含会员折扣)"""
     if 'user_id' not in session:
         return redirect(url_for('ums.login'))
 
     user_id = session['user_id']
 
-    # 获取会员折扣信息
+    # 1. 获取会员权益 (适配数据库新增的 discount)
     discount = session.get('discount', 1.0)
     level_name = session.get('level_name', '普通会员')
 
-    # 1. 查询购物车
+    # 2. 查询购物车
     sql_cart = "SELECT * FROM oms_cart_item WHERE member_id=%s ORDER BY create_date DESC"
     items = db.fetch_all(sql_cart, (user_id,))
 
-    # 2. 计算金额
-    # [修正] sum() 出来的结果是 Decimal 类型，需要转为 float 才能和 discount 相乘
-    raw_total_decimal = sum([item['price'] * item['quantity'] for item in items])
-    raw_total = float(raw_total_decimal)  # 转为浮点数
+    # 3. 计算金额 (修正 Decimal * float 报错)
+    raw_decimal = sum([item['price'] * item['quantity'] for item in items])
+    raw_total = float(raw_decimal)  # 强转 float
 
     discounted_total = raw_total * discount
 
-    # 3. 查询可用优惠券
+    # 4. 查询可用优惠券 (适配 start_time)
     now = datetime.datetime.now()
     sql_coupons = """
         SELECT h.id AS history_id, c.name, c.amount, c.min_point
@@ -42,12 +41,13 @@ def view_cart():
         JOIN sms_coupon c ON h.coupon_id = c.id
         WHERE h.member_id = %s 
           AND h.use_status = 0 
+          AND c.start_time <= %s  -- 确保活动已开始
           AND c.end_time > %s
           AND c.min_point <= %s
     """
     valid_coupons = []
     if discounted_total > 0:
-        valid_coupons = db.fetch_all(sql_coupons, (user_id, now, discounted_total))
+        valid_coupons = db.fetch_all(sql_coupons, (user_id, now, now, discounted_total))
 
     return render_template('cart.html',
                            items=items,
@@ -65,13 +65,11 @@ def add_to_cart():
     quantity = int(request.form.get('quantity', 1))
     user_id = session['user_id']
 
-    sku_sql = """
+    sku_info = db.fetch_one("""
         SELECT s.id, s.price, s.sku_code, s.sp_data, p.id as pid, p.name, p.pic 
-        FROM pms_sku_stock s
-        JOIN pms_product p ON s.product_id = p.id
-        WHERE s.id = %s
-    """
-    sku_info = db.fetch_one(sku_sql, (sku_id,))
+        FROM pms_sku_stock s JOIN pms_product p ON s.product_id = p.id WHERE s.id=%s
+    """, (sku_id,))
+
     if not sku_info: return jsonify({'code': 404, 'msg': '规格不存在'})
 
     exist = db.fetch_one("SELECT id FROM oms_cart_item WHERE member_id=%s AND product_sku_id=%s", (user_id, sku_id))
@@ -102,12 +100,11 @@ def delete_cart_item():
 
 @oms_bp.route('/submit_order', methods=['POST'])
 def submit_order():
-    """提交订单 (含会员折扣 + 优惠券)"""
+    """提交订单"""
     if 'user_id' not in session: return jsonify({'code': 401, 'msg': '登录已过期'})
 
     user_id = session['user_id']
     member_coupon_id = request.form.get('member_coupon_id')
-
     discount = session.get('discount', 1.0)
 
     cart_items = db.fetch_all("SELECT * FROM oms_cart_item WHERE member_id=%s", (user_id,))
@@ -121,15 +118,14 @@ def submit_order():
     try:
         conn.begin()
 
-        # A. 计算原始总价
+        # 计算金额 (强转 float)
         raw_decimal = sum([item['price'] * item['quantity'] for item in cart_items])
-        raw_amount = float(raw_decimal)  # [修正] 转为 float
+        raw_amount = float(raw_decimal)
 
-        # B. 应用会员折扣
         member_amount = raw_amount * discount
         final_amount = member_amount
 
-        # C. 优惠券核销
+        # 优惠券核销
         if member_coupon_id:
             sql_coupon = """
                 SELECT h.id, c.amount, c.min_point, c.end_time 
@@ -144,17 +140,17 @@ def submit_order():
             if not coupon: raise Exception("优惠券无效")
             if coupon['end_time'] < datetime.datetime.now(): raise Exception("优惠券已过期")
 
-            if member_amount < float(coupon['min_point']):  # [修正] min_point 也是 Decimal，需强转
-                raise Exception(f"会员折后金额未满 {coupon['min_point']} 元，无法使用此券")
+            if member_amount < float(coupon['min_point']):
+                raise Exception(f"会员折后金额未满 {coupon['min_point']} 元")
 
-            # [修正] amount 也是 Decimal，需强转
             final_amount = max(0, member_amount - float(coupon['amount']))
 
+            # 记录使用时间 (适配 use_time)
             with conn.cursor() as cur:
                 cur.execute("UPDATE sms_coupon_history SET use_status=1, use_time=NOW() WHERE id=%s",
                             (member_coupon_id,))
 
-        # D. 生成订单
+        # 生成订单
         order_sn = str(uuid.uuid1())
         sql_order = """
             INSERT INTO oms_order 
@@ -166,8 +162,9 @@ def submit_order():
             user_id, order_sn, final_amount, address['name'], address['phone_number'], address['detail_address']))
             order_id = cur.lastrowid
 
-            # E. 循环处理商品
+            # 扣库存 & 存详情
         for item in cart_items:
+            # 乐观锁防止超卖
             sql_stock = "UPDATE pms_sku_stock SET stock = stock - %s WHERE id = %s AND stock >= %s"
             with conn.cursor() as cur:
                 affected = cur.execute(sql_stock, (item['quantity'], item['product_sku_id'], item['quantity']))
@@ -182,7 +179,7 @@ def submit_order():
                 order_id, order_sn, item['product_id'], item['product_sku_id'], item['product_name'], item['price'],
                 item['quantity'], item['product_attr']))
 
-        # F. 清空购物车
+        # 清购物车
         with conn.cursor() as cur:
             cur.execute("DELETE FROM oms_cart_item WHERE member_id=%s", (user_id,))
 
@@ -196,7 +193,10 @@ def submit_order():
         conn.close()
 
 
-# --- 订单列表接口 ---
+# =======================
+# 3. 订单操作 (列表/支付/取消/收货)
+# =======================
+
 @oms_bp.route('/my_orders')
 def my_orders():
     if 'user_id' not in session: return redirect(url_for('ums.login'))
@@ -226,33 +226,16 @@ def cancel_order():
     return jsonify({'code': 200, 'msg': '订单已取消'})
 
 
-# --- [新增] 确认收货接口 ---
 @oms_bp.route('/confirm_receipt', methods=['POST'])
 def confirm_receipt():
-    """
-    用户确认收货
-    逻辑：将订单状态从 2(已发货) 改为 3(已完成)
-    """
-    if 'user_id' not in session:
-        return jsonify({'code': 401, 'msg': '请先登录'})
-
+    """确认收货"""
+    if 'user_id' not in session: return jsonify({'code': 401})
     order_id = request.form.get('order_id')
     user_id = session['user_id']
 
-    # 1. 校验订单：必须属于当前用户，且状态必须是 2(已发货)
-    # 防止用户恶意操作其他状态的订单
-    order = db.fetch_one(
-        "SELECT id FROM oms_order WHERE id=%s AND member_id=%s AND status=2",
-        (order_id, user_id)
-    )
+    # 只能对已发货(2)的订单确认收货
+    order = db.fetch_one("SELECT id FROM oms_order WHERE id=%s AND member_id=%s AND status=2", (order_id, user_id))
+    if not order: return jsonify({'code': 400, 'msg': '操作失败'})
 
-    if not order:
-        return jsonify({'code': 400, 'msg': '订单状态异常或不存在'})
-
-    # 2. 更新状态为 3 (已完成)
-    # 在真实业务中，这里可能还会触发增加积分、解冻分销佣金等逻辑
-    try:
-        db.execute_update("UPDATE oms_order SET status=3 WHERE id=%s", (order_id,))
-        return jsonify({'code': 200, 'msg': '交易完成！'})
-    except Exception as e:
-        return jsonify({'code': 500, 'msg': str(e)})
+    db.execute_update("UPDATE oms_order SET status=3 WHERE id=%s", (order_id,))
+    return jsonify({'code': 200, 'msg': '交易完成'})

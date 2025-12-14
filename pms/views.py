@@ -15,7 +15,6 @@ def index():
     category_id = request.args.get('cid', '')
 
     # 1. 基础查询 SQL
-    # [修正] 去掉了 p.sub_title，增加了 p.sale (销量)
     sql = """
         SELECT 
             p.id, 
