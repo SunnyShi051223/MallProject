@@ -384,6 +384,10 @@ ADD COLUMN status INT DEFAULT 1 COMMENT '帐号状态: 0->禁用; 1->启用';
 ALTER TABLE sms_coupon ADD COLUMN start_time DATETIME DEFAULT NULL;
 ALTER TABLE sms_coupon ADD COLUMN enable_status INT DEFAULT 1;
 
+
+
+-- 12.14 V2.0
+
 USE mall_b2c;
 
 -- ==========================================
