@@ -427,7 +427,9 @@ DELIMITER ;
 CREATE USER IF NOT EXISTS 'mall_app'@'%' IDENTIFIED BY 'App123!';
 GRANT SELECT, INSERT, UPDATE, DELETE ON mall_b2c.* TO 'mall_app'@'%';
 
--- 创建数据分析师账号 (只读权限，且只能查视图)
+-- 创建AI账号 (只读权限，且只能查视图)
 CREATE USER IF NOT EXISTS 'mall_analyst'@'%' IDENTIFIED BY 'Audit123!';
 GRANT SELECT ON mall_b2c.v_order_detail TO 'mall_analyst'@'%';
+
+GRANT SELECT ON mall_b2c.* TO 'mall_analyst'@'%';
 

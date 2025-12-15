@@ -11,46 +11,52 @@ db = DBHelper()
 # =======================
 
 @ums_bp.route('/login', methods=['GET', 'POST'])
-def login():
-    """用户登录"""
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+# 文件位置: ums/views.py
 
-        if not username or not password:
-            flash("账号或密码不能为空", "danger")
+@ums_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        return render_template('login.html')
+
+    # 处理 POST 登录请求
+    username = request.form.get('username')
+    password = request.form.get('password')
+
+    # 1. 查询用户
+    # 注意：这里关联查询了等级表，为了获取折扣和等级名称
+    sql = """
+        SELECT m.*, l.name as level_name, l.discount 
+        FROM ums_member m
+        LEFT JOIN ums_member_level l ON m.member_level_id = l.id
+        WHERE m.username=%s AND m.password=%s
+    """
+    user = db.fetch_one(sql, (username, password))
+
+    if user:
+        if user['status'] == 0:
+            flash("账号已被禁用", "danger")
             return redirect(url_for('ums.login'))
 
-        # 关联查询：同时获取用户等级名称和折扣率
-        sql = """
-            SELECT u.*, l.name as level_name, l.discount 
-            FROM ums_member u
-            LEFT JOIN ums_member_level l ON u.member_level_id = l.id
-            WHERE u.username=%s AND u.password=%s
-        """
-        user = db.fetch_one(sql, (username, password))
+        # =================================================
+        # 🔥 核心修复：将关键信息写入 Session
+        # =================================================
+        session['user_id'] = user['id']
+        session['username'] = user['username']
 
-        if user:
-            if user['status'] == 0:
-                flash("账号已被禁用，请联系管理员", "danger")
-                return redirect(url_for('ums.login'))
+        # 修复点 1：如果没有昵称，就默认显示用户名，防止显示 None
+        session['nickname'] = user['nickname'] if user['nickname'] else user['username']
 
-            # [关键修复] 登录普通用户前，彻底清除管理员状态！防止串号
-            session.pop('admin_id', None)
-            session.pop('admin_name', None)
+        # 修复点 2：存入等级和折扣（为了之前的购物车计算正确）
+        session['level_name'] = user['level_name'] if user['level_name'] else '普通会员'
+        session['discount'] = float(user['discount']) if user['discount'] else 1.0
 
-            # 写入用户 Session
-            session['user_id'] = user['id']
-            session['username'] = user['nickname'] or user['username']
-            session['level_name'] = user['level_name'] or '普通会员'
-            session['discount'] = float(user['discount']) if user['discount'] else 1.0
+        # =================================================
 
-            flash(f"欢迎回来，尊贵的 {session['level_name']}！", "success")
-            return redirect(url_for('pms.index'))
-        else:
-            flash("账号或密码错误，请重试", "danger")
-
-    return render_template('login.html')
+        flash("登录成功！", "success")
+        return redirect(url_for('pms.index'))
+    else:
+        flash("用户名或密码错误", "danger")
+        return redirect(url_for('ums.login'))
 
 
 @ums_bp.route('/register', methods=['GET', 'POST'])

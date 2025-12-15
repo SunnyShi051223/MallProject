@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-2 mb-3">
+        {% include 'sidebar.html' ignore missing %}
+    </div>
+
+    <div class="col-md-10">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-grid"></i> 分类管理</h5>
+            </div>
+            <div class="card-body">
+                <form id="addCatForm" class="row g-3 align-items-center mb-4 border-bottom pb-4">
+                    <div class="col-auto">
+                        <input type="text" name="name" class="form-control" placeholder="输入新分类名称" required>
+                    </div>
+                    <div class="col-auto">
+                        <input type="number" name="sort" class="form-control" placeholder="排序(0-100)" value="0">
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" onclick="addCategory()" class="btn btn-primary">添加分类</button>
+                    </div>
+                </form>
+
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>分类名称</th>
+                            <th>排序</th>
+                            <th>关联商品数</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in cats %}
+                        <tr>
+                            <td>{{ c.id }}</td>
+                            <td class="fw-bold">{{ c.name }}</td>
+                            <td>{{ c.sort }}</td>
+                            <td>
+                                {% if c.product_count > 0 %}
+                                    <span class="badge bg-primary">{{ c.product_count }} 件</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">空</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button onclick="deleteCategory({{ c.id }})" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i> 删除
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function addCategory() {
+        $.post('/admin/category/add', $('#addCatForm').serialize(), function(res){
+            if(res.code === 200) {
+                location.reload();
+            } else {
+                alert(res.msg);
+            }
+        });
+    }
+
+    function deleteCategory(id) {
+        if(confirm("确定要删除该分类吗？")) {
+            $.post('/admin/category/delete', {id: id}, function(res){
+                if(res.code === 200) {
+                    alert("✅ 删除成功");
+                    location.reload();
+                } else {
+                    // 这里会弹出后端返回的具体的错误提示
+                    alert("❌ " + res.msg);
+                }
+            });
+        }
+    }
+</script>
+{% endblock %}

@@ -1,7 +1,8 @@
 from flask import Flask, redirect, url_for
 from config import Config
 
-# 导入所有子系统的 Blueprint
+
+from ai.views import ai_bp
 from ums.views import ums_bp
 from pms.views import pms_bp
 from oms.views import oms_bp
@@ -21,6 +22,7 @@ app.register_blueprint(sms_bp, url_prefix='/sms')
 app.register_blueprint(wms_bp, url_prefix='/wms')
 app.register_blueprint(cms_bp, url_prefix='/cms')
 app.register_blueprint(sys_bp, url_prefix='/admin')
+app.register_blueprint(ai_bp, url_prefix='/ai')
 
 @app.route('/')
 def index():

@@ -254,3 +254,65 @@ def coupon_delete():
         return jsonify({'code': 200, 'msg': '删除成功'})
     except Exception as e:
         return jsonify({'code': 500, 'msg': str(e)})
+
+
+# MallProject/sys_admin/views.py
+
+# =======================
+# 5. 分类管理模块 (新增)
+# =======================
+
+@sys_bp.route('/category/list')
+def category_list():
+    """分类列表页"""
+    # 查询分类，并统计每个分类下有多少个商品 (关联查询)
+    sql = """
+        SELECT c.*, COUNT(p.id) as product_count 
+        FROM pms_category c 
+        LEFT JOIN pms_product p ON c.id = p.category_id 
+        GROUP BY c.id 
+        ORDER BY c.sort ASC
+    """
+    cats = db.fetch_all(sql)
+    return render_template('admin_category_list.html', cats=cats)
+
+
+@sys_bp.route('/category/add', methods=['POST'])
+def category_add():
+    """快速添加分类"""
+    name = request.form.get('name')
+    sort = request.form.get('sort', 0)
+
+    if not name:
+        return jsonify({'code': 400, 'msg': '名称不能为空'})
+
+    try:
+        sql = "INSERT INTO pms_category (name, parent_id, level, sort) VALUES (%s, 0, 0, %s)"
+        db.execute_update(sql, (name, sort))
+        return jsonify({'code': 200, 'msg': '添加成功'})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': str(e)})
+
+
+@sys_bp.route('/category/delete', methods=['POST'])
+def category_delete():
+    """
+    删除分类 (核心逻辑)
+    """
+    cat_id = request.form.get('id')
+
+    # 1. [核心检查] 检查该分类下是否有商品
+    # 注意：这里我们不仅查 pms_product，最好也查一下是否有子分类(如果你的系统支持多级分类)
+    product_count = db.fetch_one("SELECT COUNT(*) as cnt FROM pms_product WHERE category_id=%s", (cat_id,))
+
+    if product_count['cnt'] > 0:
+        # 如果有商品，直接拒绝，并告诉前端有多少个商品
+        return jsonify(
+            {'code': 400, 'msg': f'删除失败：该分类下仍有 {product_count["cnt"]} 件商品！请先转移或删除这些商品。'})
+
+    # 2. 如果是空分类，允许删除
+    try:
+        db.execute_update("DELETE FROM pms_category WHERE id=%s", (cat_id,))
+        return jsonify({'code': 200, 'msg': '删除成功'})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': str(e)})
