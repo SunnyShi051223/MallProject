@@ -17,7 +17,6 @@ class DBHelper:
 
         # 场景 B: 外部传了账号 (比如 AI 模块传入了 mall_analyst)
         # 使用传入的账号
-
         if user:
             self.user = user
             self.password = password
