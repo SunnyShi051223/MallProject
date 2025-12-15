@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>退货申请处理 - 后台管理</title>
+    <title>退货处理 - 后台</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
 </head>
@@ -10,7 +10,7 @@
 
 <nav class="navbar navbar-dark bg-dark mb-4">
     <div class="container-fluid">
-        <span class="navbar-brand mb-0 h1">商城后台管理系统</span>
+        <span class="navbar-brand mb-0 h1">商城后台管理</span>
         <a href="/admin/dashboard" class="btn btn-outline-light btn-sm">返回仪表盘</a>
     </div>
 </nav>
@@ -18,10 +18,9 @@
 <div class="container">
     <div class="card shadow-sm">
         <div class="card-header bg-white py-3">
-            <h5 class="mb-0 text-primary"><i class="bi bi-arrow-repeat"></i> 售后申请处理</h5>
+            <h5 class="mb-0 text-primary">售后申请处理</h5>
         </div>
         <div class="card-body">
-
             {% with messages = get_flashed_messages() %}
               {% if messages %}
                 {% for message in messages %}
@@ -33,66 +32,54 @@
               {% endif %}
             {% endwith %}
 
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>申请ID</th>
-                            <th>订单号</th>
-                            <th>退款金额</th>
-                            <th>退货原因</th>
-                            <th>申请时间</th>
-                            <th>状态</th>
-                            <th class="text-end">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in apply_list %}
-                        <tr>
-                            <td>#{{ item.id }}</td>
-                            <td>{{ item.order_sn }}</td>
-                            <td class="text-danger fw-bold">¥{{ item.total_amount }}</td>
-                            <td class="text-truncate" style="max-width: 200px;" title="{{ item.reason }}">
-                                {{ item.reason }}
-                            </td>
-                            <td class="text-muted small">{{ item.create_time }}</td>
-                            <td>
-                                {% if item.status == 0 %}
-                                    <span class="badge bg-warning text-dark">⏳ 待处理</span>
-                                {% elif item.status == 1 %}
-                                    <span class="badge bg-success">✅ 已同意</span>
-                                {% elif item.status == 2 %}
-                                    <span class="badge bg-secondary">🚫 已拒绝</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end">
-                                {% if item.status == 0 %}
-                                    <form action="/admin/handle_return" method="post" class="d-inline">
-                                        <input type="hidden" name="apply_id" value="{{ item.id }}">
-                                        <input type="hidden" name="action" value="agree">
-                                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('确认同意？原订单将关闭。')">同意</button>
-                                    </form>
-                                    <form action="/admin/handle_return" method="post" class="d-inline">
-                                        <input type="hidden" name="apply_id" value="{{ item.id }}">
-                                        <input type="hidden" name="action" value="reject">
-                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确认拒绝？')">拒绝</button>
-                                    </form>
-                                {% else %}
-                                    <button class="btn btn-sm btn-light" disabled>已审核</button>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="7" class="text-center py-4 text-muted">暂无退货申请</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>订单号</th>
+                        <th>金额</th>
+                        <th>原因</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in apply_list %}
+                    <tr>
+                        <td>#{{ item.id }}</td>
+                        <td>{{ item.order_sn }}</td>
+                        <td class="text-danger">¥{{ item.total_amount }}</td>
+                        <td>{{ item.reason }}</td>
+                        <td>
+                            {% if item.status == 0 %} <span class="badge bg-warning text-dark">待处理</span>
+                            {% elif item.status == 1 %} <span class="badge bg-success">已通过</span>
+                            {% elif item.status == 2 %} <span class="badge bg-secondary">已拒绝</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.status == 0 %}
+                                <form action="/admin/handle_return" method="post" class="d-inline">
+                                    <input type="hidden" name="apply_id" value="{{ item.id }}">
+                                    <input type="hidden" name="action" value="agree">
+                                    <button class="btn btn-sm btn-success" onclick="return confirm('确认同意？')">同意</button>
+                                </form>
+                                <form action="/admin/handle_return" method="post" class="d-inline">
+                                    <input type="hidden" name="apply_id" value="{{ item.id }}">
+                                    <input type="hidden" name="action" value="reject">
+                                    <button class="btn btn-sm btn-danger" onclick="return confirm('确认拒绝？')">拒绝</button>
+                                </form>
+                            {% else %}
+                                <button class="btn btn-sm btn-light" disabled>已完成</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center">暂无申请</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
-
 </body>
 </html>

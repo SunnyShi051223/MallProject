@@ -10,7 +10,7 @@
             {% for message in messages %}
               <div class="alert alert-info alert-dismissible fade show" role="alert">
                 {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
               </div>
             {% endfor %}
           {% endif %}
@@ -53,15 +53,12 @@
                 {% if order.status == 0 %}
                     <button onclick="cancelOrder('{{ order.id }}')" class="btn btn-sm btn-outline-secondary">取消订单</button>
                     <button onclick="payOrder('{{ order.id }}')" class="btn btn-sm btn-danger">去支付</button>
-
                 {% elif order.status == 1 %}
                     <button class="btn btn-sm btn-light" disabled>商家正在打包...</button>
-
                 {% elif order.status == 2 %}
                     <button onclick="confirmReceipt('{{ order.id }}')" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-check-circle"></i> 确认收货
                     </button>
-
                 {% elif order.status == 3 %}
                     {% if order.return_status is none %}
                         <a href="/oms/return_page/{{ order.id }}" class="btn btn-sm btn-outline-danger">申请退货</a>
@@ -74,9 +71,7 @@
                             <button class="btn btn-sm btn-secondary" disabled>🚫 退货被拒</button>
                         {% endif %}
                     {% endif %}
-
                     <a href="/pms/index" class="btn btn-sm btn-outline-success">再来一单</a>
-
                 {% else %}
                     <button class="btn btn-sm btn-light" disabled>已关闭</button>
                 {% endif %}
@@ -92,29 +87,14 @@
 </div>
 
 <script>
-    function payOrder(orderId) {
-        if(confirm("模拟支付：确认支付？")) {
-            $.post('/oms/pay_order', {order_id: orderId}, function(res){
-                if(res.code === 200) { alert("✅ 支付成功！"); location.reload(); }
-                else { alert("支付失败: " + res.msg); }
-            });
-        }
+    function payOrder(id) {
+        if(confirm("确认支付吗？")) $.post('/oms/pay_order', {order_id: id}, res => { location.reload() });
     }
-    function cancelOrder(orderId) {
-        if(confirm("确定取消订单？")) {
-            $.post('/oms/cancel_order', {order_id: orderId}, function(res){
-                if(res.code === 200) { alert("订单已取消"); location.reload(); }
-                else { alert("操作失败: " + res.msg); }
-            });
-        }
+    function cancelOrder(id) {
+        if(confirm("确认取消吗？")) $.post('/oms/cancel_order', {order_id: id}, res => { location.reload() });
     }
-    function confirmReceipt(orderId) {
-        if(confirm("确认收货？")) {
-            $.post('/oms/confirm_receipt', {order_id: orderId}, function(res){
-                if(res.code === 200) { alert("🎉 交易完成！"); location.reload(); }
-                else { alert("操作失败: " + res.msg); }
-            });
-        }
+    function confirmReceipt(id) {
+        if(confirm("确认收货吗？")) $.post('/oms/confirm_receipt', {order_id: id}, res => { location.reload() });
     }
 </script>
 {% endblock %}
