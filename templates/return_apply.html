@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">申请售后服务</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        温馨提示：退货申请提交后，客服将在 1-3 个工作日内审核。
+                    </div>
+
+                    <div class="mb-4 p-3 bg-light rounded">
+                        <h5 class="border-bottom pb-2">📦 订单信息</h5>
+                        <p><strong>订单号：</strong> {{ order.order_sn }}</p>
+                        <p><strong>金额：</strong> <span class="text-danger fw-bold">¥ {{ order.total_amount }}</span></p>
+                    </div>
+
+                    <form action="/oms/apply_return" method="post">
+                        <input type="hidden" name="order_id" value="{{ order.id }}">
+
+                        <div class="mb-4">
+                            <label for="reason" class="form-label fw-bold">退货原因：</label>
+                            <textarea class="form-control" id="reason" name="reason" rows="5" required></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/oms/my_orders" class="btn btn-secondary me-md-2">返回</a>
+                            <button type="submit" class="btn btn-danger px-4">提交申请</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

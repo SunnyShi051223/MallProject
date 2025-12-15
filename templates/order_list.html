@@ -5,6 +5,17 @@
     <div class="col-12">
         <h2 class="mb-4 border-bottom pb-2">🧾 我的订单列表</h2>
 
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-info alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
         {% for order in orders %}
         <div class="card mb-4 shadow-sm border-0">
             <div class="card-header bg-light d-flex justify-content-between align-items-center">
@@ -42,14 +53,30 @@
                 {% if order.status == 0 %}
                     <button onclick="cancelOrder('{{ order.id }}')" class="btn btn-sm btn-outline-secondary">取消订单</button>
                     <button onclick="payOrder('{{ order.id }}')" class="btn btn-sm btn-danger">去支付</button>
+
                 {% elif order.status == 1 %}
                     <button class="btn btn-sm btn-light" disabled>商家正在打包...</button>
+
                 {% elif order.status == 2 %}
                     <button onclick="confirmReceipt('{{ order.id }}')" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-check-circle"></i> 确认收货
                     </button>
+
                 {% elif order.status == 3 %}
+                    {% if order.return_status is none %}
+                        <a href="/oms/return_page/{{ order.id }}" class="btn btn-sm btn-outline-danger">申请退货</a>
+                    {% else %}
+                        {% if order.return_status == 0 %}
+                            <button class="btn btn-sm btn-warning" disabled>⏳ 退货审核中</button>
+                        {% elif order.return_status == 1 %}
+                            <button class="btn btn-sm btn-secondary" disabled>✅ 已退款</button>
+                        {% elif order.return_status == 2 %}
+                            <button class="btn btn-sm btn-secondary" disabled>🚫 退货被拒</button>
+                        {% endif %}
+                    {% endif %}
+
                     <a href="/pms/index" class="btn btn-sm btn-outline-success">再来一单</a>
+
                 {% else %}
                     <button class="btn btn-sm btn-light" disabled>已关闭</button>
                 {% endif %}
@@ -58,7 +85,6 @@
         {% else %}
         <div class="alert alert-info text-center py-5">
             <h4>暂无历史订单</h4>
-            <p>您还没有买过东西，快去下单吧！</p>
             <a href="/pms/index" class="btn btn-primary">去购物</a>
         </div>
         {% endfor %}
@@ -66,44 +92,27 @@
 </div>
 
 <script>
-    // 支付逻辑
     function payOrder(orderId) {
-        if(confirm("模拟支付：确认支付该订单吗？")) {
+        if(confirm("模拟支付：确认支付？")) {
             $.post('/oms/pay_order', {order_id: orderId}, function(res){
-                if(res.code === 200) {
-                    alert("✅ 支付成功！");
-                    location.reload();
-                } else {
-                    alert("支付失败: " + res.msg);
-                }
+                if(res.code === 200) { alert("✅ 支付成功！"); location.reload(); }
+                else { alert("支付失败: " + res.msg); }
             });
         }
     }
-
-    // 取消逻辑
     function cancelOrder(orderId) {
-        if(confirm("确定要取消这个订单吗？")) {
+        if(confirm("确定取消订单？")) {
             $.post('/oms/cancel_order', {order_id: orderId}, function(res){
-                if(res.code === 200) {
-                    alert("订单已取消");
-                    location.reload();
-                } else {
-                    alert("取消失败: " + res.msg);
-                }
+                if(res.code === 200) { alert("订单已取消"); location.reload(); }
+                else { alert("操作失败: " + res.msg); }
             });
         }
     }
-
-    // [新增] 确认收货逻辑
     function confirmReceipt(orderId) {
-        if(confirm("确认已收到商品且无误吗？\n确认后订单将完结。")) {
+        if(confirm("确认收货？")) {
             $.post('/oms/confirm_receipt', {order_id: orderId}, function(res){
-                if(res.code === 200) {
-                    alert("🎉 交易完成！感谢您的支持！");
-                    location.reload();
-                } else {
-                    alert("操作失败: " + res.msg);
-                }
+                if(res.code === 200) { alert("🎉 交易完成！"); location.reload(); }
+                else { alert("操作失败: " + res.msg); }
             });
         }
     }

@@ -8,15 +8,14 @@ class DBHelper:
         self.charset = 'utf8mb4'
 
         # ========================================================
-        # 🔑 账号配置逻辑
+        # 🔑 账号配置 (请确认您的 root 密码)
         # ========================================================
 
-        # 场景 A: 外部没有传账号 (比如购物车、注册、后台管理)
+        # 默认使用管理员账号 (用于购物车、下单、登录)
         default_user = 'root'
         default_password = 'shisannian1223'
 
-        # 场景 B: 外部传了账号 (比如 AI 模块传入了 mall_analyst)
-        # 使用传入的账号
+        # 逻辑：如果外部传了账号(比如AI模块)，就用外部的；否则用默认管理员
         if user:
             self.user = user
             self.password = password
@@ -32,7 +31,7 @@ class DBHelper:
             password=self.password,
             database=self.db,
             charset=self.charset,
-            cursorclass=pymysql.cursors.DictCursor  # 关键：返回字典格式数据
+            cursorclass=pymysql.cursors.DictCursor
         )
 
     def fetch_all(self, sql, params=None):
@@ -58,7 +57,7 @@ class DBHelper:
     def execute_update(self, sql, params=None):
         """
         执行增删改 (INSERT, UPDATE, DELETE)
-        购物车报错就是因为之前这里默认用了只读账户
+        会自动提交事务
         """
         conn = self.get_connection()
         try:
