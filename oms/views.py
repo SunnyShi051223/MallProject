@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db_helper import DBHelper
+import datetime
+import uuid
 
 # =================================================
-# 👇👇👇 必须取消注释，否则报 NameError 👇👇👇
+# 蓝图与数据库初始化
 # =================================================
 oms_bp = Blueprint('oms', __name__)
 db = DBHelper()
@@ -22,11 +24,12 @@ def view_cart():
     sql = "SELECT * FROM oms_cart_item WHERE member_id=%s ORDER BY create_date DESC"
     items = db.fetch_all(sql, (user_id,))
 
-    # 计算原价总额
+    # 计算原价总额 (Decimal 类型)
     raw_total = sum(item['price'] * item['quantity'] for item in items)
 
     # 计算折后总额
-    total = raw_total * discount
+    # 🔧【修复点】：将 Decimal 转为 float 再计算，防止报错
+    total = float(raw_total) * discount
 
     # 获取可用优惠券
     now = datetime.datetime.now()
@@ -111,9 +114,12 @@ def submit_order():
         return jsonify({'code': 400, 'msg': '请先添加收货地址'})
 
     # 3. 计算金额
+    # 注意：这里计算出来的是 Decimal
     raw_amount = sum(item['price'] * item['quantity'] for item in cart_items)
+
+    # 转 float 计算折扣
     discount = session.get('discount', 1.0)
-    member_amount = raw_amount * discount  # 会员折后价
+    member_amount = float(raw_amount) * discount  # 会员折后价
     final_amount = member_amount
 
     conn = db.get_connection()
@@ -136,10 +142,11 @@ def submit_order():
                 raise Exception("优惠券无效")
             if coupon['end_time'] < datetime.datetime.now():
                 raise Exception("优惠券已过期")
-            if member_amount < coupon['min_point']:
+            # 比较时要把 member_amount (float) 和 min_point (Decimal) 统一
+            if member_amount < float(coupon['min_point']):
                 raise Exception(f"未满 {coupon['min_point']} 元，无法使用此券")
 
-            final_amount = member_amount - coupon['amount']
+            final_amount = member_amount - float(coupon['amount'])
             if final_amount < 0: final_amount = 0
 
             # 标记优惠券已用
@@ -191,7 +198,7 @@ def submit_order():
         conn.close()
 
 
-# --- 👇👇👇 你的退货和列表逻辑 👇👇👇 ---
+# --- 订单列表 & 退货逻辑 ---
 
 @oms_bp.route('/my_orders')
 def my_orders():
@@ -199,7 +206,6 @@ def my_orders():
     if not user_id:
         return redirect('/ums/login')
 
-    # 关联查询退货状态
     sql = """
         SELECT o.*, ra.status AS return_status, ra.id AS return_id
         FROM oms_order o
@@ -229,7 +235,6 @@ def return_page(order_id):
         flash("只有【已完成】的订单才能申请售后服务")
         return redirect(url_for('oms.my_orders'))
 
-    # 防止重复申请
     check_sql = "SELECT id FROM oms_order_return_apply WHERE order_id=%s"
     has_applied = db.fetch_one(check_sql, (order_id,))
     if has_applied:
@@ -253,7 +258,6 @@ def apply_return():
         return redirect(url_for('oms.return_page', order_id=order_id))
 
     try:
-        # 重复检查
         if db.fetch_one("SELECT id FROM oms_order_return_apply WHERE order_id=%s", (order_id,)):
             flash("请勿重复提交")
             return redirect(url_for('oms.my_orders'))
@@ -270,13 +274,11 @@ def apply_return():
         return redirect(url_for('oms.my_orders'))
 
 
-# 支付和取消接口
 @oms_bp.route('/pay_order', methods=['POST'])
 def pay_order():
     order_id = request.form.get('order_id')
     user_id = session.get('user_id')
 
-    # 校验
     check = db.fetch_one("SELECT id FROM oms_order WHERE id=%s AND member_id=%s AND status=0", (order_id, user_id))
     if not check:
         return jsonify({'code': 400, 'msg': '订单状态异常'})
@@ -297,7 +299,3 @@ def confirm_receipt():
     order_id = request.form.get('order_id')
     db.execute_update("UPDATE oms_order SET status=3 WHERE id=%s", (order_id,))
     return jsonify({'code': 200, 'msg': '交易完成'})
-
-
-import datetime
-import uuid

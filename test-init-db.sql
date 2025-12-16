@@ -410,6 +410,7 @@ CREATE TABLE IF NOT EXISTS sys_log (
 -- 创建触发器：订单完成时自动写日志
 DROP TRIGGER IF EXISTS t_order_complete_log;
 DELIMITER $$
+
 CREATE TRIGGER t_order_complete_log
 AFTER UPDATE ON oms_order
 FOR EACH ROW
@@ -418,6 +419,7 @@ BEGIN
         INSERT INTO sys_log (content)
         VALUES (CONCAT('系统自动记录：订单 ', NEW.order_sn, ' 交易完成。'));
     END IF;
+
 END $$
 DELIMITER ;
 
