@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db_helper import DBHelper
+import os  # <--- 新增导入
 
 sys_bp = Blueprint('sys_admin', __name__)
 db = DBHelper()
@@ -60,10 +61,9 @@ def dashboard():
                            orders=latest_orders)
 
 
-# --- 📦 商品管理 (修复 404) ---
-@sys_bp.route('/product_list')  # 对应 dashboard 的 /admin/product_list
+# --- 📦 商品管理 ---
+@sys_bp.route('/product_list')
 def product_list():
-    # 关联查询总库存
     sql = """
         SELECT p.*, IFNULL(SUM(s.stock), 0) as total_stock 
         FROM pms_product p
@@ -83,7 +83,6 @@ def product_add():
         brands = db.fetch_all("SELECT * FROM pms_brand")
         return render_template('admin_product_add.html', cats=cats, brands=brands)
 
-    # 处理商品发布
     try:
         name = request.form.get('name')
         sn = request.form.get('product_sn')
@@ -91,24 +90,20 @@ def product_add():
         brand_name = request.form.get('brand_name')
         pic = request.form.get('pic')
 
-        # 简化逻辑：假设分类和品牌已存在或使用默认ID
         cat_res = db.fetch_one("SELECT id FROM pms_category WHERE name=%s", (cat_name,))
         cat_id = cat_res['id'] if cat_res else 1
-
         brand_res = db.fetch_one("SELECT id FROM pms_brand WHERE name=%s", (brand_name,))
         brand_id = brand_res['id'] if brand_res else 1
 
         conn = db.get_connection()
         conn.begin()
         with conn.cursor() as cur:
-            # 插入主表
             cur.execute("""
                 INSERT INTO pms_product (brand_id, category_id, name, pic, product_sn, publish_status, price, sale)
                 VALUES (%s, %s, %s, %s, %s, 1, 0, 0)
             """, (brand_id, cat_id, name, pic, sn))
             pid = cur.lastrowid
 
-            # 插入 SKU
             specs = request.form.getlist('sku_specs[]')
             prices = request.form.getlist('sku_prices[]')
             stocks = request.form.getlist('sku_stocks[]')
@@ -138,8 +133,8 @@ def product_delete():
     return jsonify({'code': 200})
 
 
-# --- 🧾 订单管理 (修复 404) ---
-@sys_bp.route('/order_list')  # 对应 dashboard 的 /admin/order_list
+# --- 🧾 订单管理 ---
+@sys_bp.route('/order_list')
 def order_list():
     sql = "SELECT * FROM oms_order ORDER BY create_time DESC"
     orders = db.fetch_all(sql)
@@ -153,43 +148,7 @@ def order_ship():
     return jsonify({'code': 200})
 
 
-# --- 🎫 优惠券管理 ---
-@sys_bp.route('/coupon_list')
-def coupon_list():
-    coupons = db.fetch_all("SELECT * FROM sms_coupon ORDER BY id DESC")
-    return render_template('admin_coupon_list.html', coupons=coupons)
-
-
-@sys_bp.route('/coupon/add', methods=['GET', 'POST'])
-def coupon_add():
-    if request.method == 'GET':
-        return render_template('admin_coupon_add.html')
-
-    # 接收表单
-    name = request.form.get('name')
-    amount = request.form.get('amount')
-    min_point = request.form.get('min_point')
-    start = request.form.get('start_time')
-    end = request.form.get('end_time')
-    count = request.form.get('publish_count')
-
-    sql = """
-        INSERT INTO sms_coupon (name, amount, min_point, start_time, end_time, publish_count, receive_count)
-        VALUES (%s, %s, %s, %s, %s, %s, 0)
-    """
-    db.execute_update(sql, (name, amount, min_point, start, end, count))
-    flash("优惠券发布成功", "success")
-    return redirect(url_for('sys_admin.coupon_list'))
-
-
-@sys_bp.route('/coupon/delete', methods=['POST'])
-def coupon_delete():
-    cid = request.form.get('id')
-    db.execute_update("DELETE FROM sms_coupon WHERE id=%s", (cid,))
-    return jsonify({'code': 200})
-
-
-# --- ↩️ 售后处理 (之前写的功能) ---
+# --- ↩️ 售后处理 ---
 @sys_bp.route('/return_list')
 def return_list():
     sql = """
@@ -223,3 +182,64 @@ def handle_return():
         flash(f"操作失败: {e}")
 
     return redirect(url_for('sys_admin.return_list'))
+
+
+# --- 💾 数据库备份与恢复 (新增) ---
+# 注意：这需要您的服务器/本机安装了 MySQL 并且 mysqldump 命令在环境变量 PATH 中
+# sys_admin/views.py (请确保头部导入了 os)
+import os
+
+
+# ... (前面的代码保持不变) ...
+
+# --- 💾 数据库备份与恢复 (相对路径版) ---
+
+@sys_bp.route('/db/backup', methods=['POST'])
+def db_backup():
+    # 1. 获取当前文件(views.py)的目录 -> sys_admin
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 2. 回退一级到根目录，再进入 DB 目录
+    backup_dir = os.path.join(base_dir, '..', 'DB')
+    # 3. 拼接文件名
+    backup_path = os.path.join(backup_dir, 'mall_b2c_backup.sql')
+
+    # 标准化路径分隔符 (处理 Windows/Linux 差异)
+    backup_path = os.path.normpath(backup_path)
+
+    # 确保 DB 目录存在
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+
+    # 构建命令：使用双引号包裹路径以防止空格报错
+    # 注意：-p和密码之间不能有空格
+    cmd = f'mysqldump -u root -pshisannian1223 mall_b2c > "{backup_path}"'
+
+    try:
+        if os.system(cmd) == 0:
+            return jsonify({'code': 200, 'msg': f'备份成功！\n文件位置: {backup_path}'})
+        else:
+            return jsonify({'code': 500, 'msg': '备份失败，请检查 mysqldump 环境变量'})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': str(e)})
+
+
+@sys_bp.route('/db/restore', methods=['POST'])
+def db_restore():
+    # 同样计算相对路径
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    backup_path = os.path.join(base_dir, '..', 'DB', 'mall_b2c_backup.sql')
+    backup_path = os.path.normpath(backup_path)
+
+    if not os.path.exists(backup_path):
+        return jsonify({'code': 400, 'msg': '找不到备份文件，请先执行备份'})
+
+    # 构建命令
+    cmd = f'mysql -u root -pshisannian1223 mall_b2c < "{backup_path}"'
+
+    try:
+        if os.system(cmd) == 0:
+            return jsonify({'code': 200, 'msg': '数据库已成功恢复！'})
+        else:
+            return jsonify({'code': 500, 'msg': '恢复失败，可能是 SQL 文件损坏'})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': str(e)})
