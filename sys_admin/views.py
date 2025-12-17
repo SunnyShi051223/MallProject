@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db_helper import DBHelper
-import os  # <--- 新增导入
+import os
 
 sys_bp = Blueprint('sys_admin', __name__)
 db = DBHelper()
@@ -148,6 +148,42 @@ def order_ship():
     return jsonify({'code': 200})
 
 
+# --- 🎫 优惠券管理 (新增修复) ---
+@sys_bp.route('/coupon_list')
+def coupon_list():
+    coupons = db.fetch_all("SELECT * FROM sms_coupon ORDER BY id DESC")
+    return render_template('admin_coupon_list.html', coupons=coupons)
+
+
+@sys_bp.route('/coupon/add', methods=['GET', 'POST'])
+def coupon_add():
+    if request.method == 'GET':
+        return render_template('admin_coupon_add.html')
+
+    name = request.form.get('name')
+    amount = request.form.get('amount')
+    min_point = request.form.get('min_point')
+    start_time = request.form.get('start_time')
+    end_time = request.form.get('end_time')
+    publish_count = request.form.get('publish_count')
+
+    # enable_status 默认给 1 (启用)
+    sql = """
+        INSERT INTO sms_coupon (name, amount, min_point, start_time, end_time, publish_count, receive_count, enable_status)
+        VALUES (%s, %s, %s, %s, %s, %s, 0, 1)
+    """
+    db.execute_update(sql, (name, amount, min_point, start_time, end_time, publish_count))
+    flash("优惠券发布成功", "success")
+    return redirect(url_for('sys_admin.coupon_list'))
+
+
+@sys_bp.route('/coupon/delete', methods=['POST'])
+def coupon_delete():
+    coupon_id = request.form.get('id')
+    db.execute_update("DELETE FROM sms_coupon WHERE id=%s", (coupon_id,))
+    return jsonify({'code': 200})
+
+
 # --- ↩️ 售后处理 ---
 @sys_bp.route('/return_list')
 def return_list():
@@ -184,16 +220,7 @@ def handle_return():
     return redirect(url_for('sys_admin.return_list'))
 
 
-# --- 💾 数据库备份与恢复 (新增) ---
-# 注意：这需要您的服务器/本机安装了 MySQL 并且 mysqldump 命令在环境变量 PATH 中
-# sys_admin/views.py (请确保头部导入了 os)
-import os
-
-
-# ... (前面的代码保持不变) ...
-
-# --- 💾 数据库备份与恢复 (相对路径版) ---
-
+# --- 💾 数据库备份与恢复 (相对路径) ---
 @sys_bp.route('/db/backup', methods=['POST'])
 def db_backup():
     # 1. 获取当前文件(views.py)的目录 -> sys_admin
@@ -203,15 +230,14 @@ def db_backup():
     # 3. 拼接文件名
     backup_path = os.path.join(backup_dir, 'mall_b2c_backup.sql')
 
-    # 标准化路径分隔符 (处理 Windows/Linux 差异)
+    # 标准化路径分隔符
     backup_path = os.path.normpath(backup_path)
 
     # 确保 DB 目录存在
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
 
-    # 构建命令：使用双引号包裹路径以防止空格报错
-    # 注意：-p和密码之间不能有空格
+    # 构建命令
     cmd = f'mysqldump -u root -pshisannian1223 mall_b2c > "{backup_path}"'
 
     try:

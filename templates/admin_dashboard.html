@@ -47,6 +47,17 @@
             </div>
 
             <div class="col-md-3">
+                <div class="card h-100 shadow-sm border-warning">
+                    <div class="card-body text-center">
+                        <i class="bi bi-ticket-perforated display-4 text-warning mb-3"></i>
+                        <h5 class="card-title">营销中心</h5>
+                        <p class="card-text text-muted">发布/管理优惠券</p>
+                        <a href="/admin/coupon_list" class="btn btn-warning text-white">进入管理</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
                 <div class="card h-100 shadow-sm border-danger">
                     <div class="card-body text-center">
                         <i class="bi bi-arrow-repeat display-4 text-danger mb-3"></i>
@@ -57,15 +68,16 @@
                 </div>
             </div>
 
-            <div class="col-md-3">
-                <div class="card h-100 shadow-sm border-info">
-                    <div class="card-body text-center">
-                        <i class="bi bi-hdd-network display-4 text-info mb-3"></i>
-                        <h5 class="card-title">数据维护</h5>
-                        <p class="card-text text-muted">备份/恢复 SQL</p>
-                        <div class="d-grid gap-2">
-                            <button onclick="backupDB()" class="btn btn-outline-info btn-sm">备份数据库</button>
-                            <button onclick="restoreDB()" class="btn btn-outline-warning btn-sm">恢复数据库</button>
+            <div class="col-md-12 mt-4">
+                <div class="card shadow-sm border-info">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title text-info mb-1"><i class="bi bi-hdd-network"></i> 数据维护</h5>
+                            <small class="text-muted">备份文件将保存在项目 [DB] 目录</small>
+                        </div>
+                        <div>
+                            <button onclick="backupDB()" class="btn btn-outline-info me-2">备份数据库</button>
+                            <button onclick="restoreDB()" class="btn btn-outline-warning">恢复数据库</button>
                         </div>
                     </div>
                 </div>
@@ -77,7 +89,6 @@
     <script>
     // 备份逻辑
     function backupDB() {
-        // 修改提示语
         if(confirm("确定要备份数据库吗？\n备份文件将保存在项目的 [DB] 目录下。")) {
             $.post('/admin/db/backup', {}, function(res) {
                 if (res.code === 200) {
@@ -93,7 +104,7 @@
 
     // 恢复逻辑
     function restoreDB() {
-        if(confirm("⚠️ 高能预警：\n恢复操作将【覆盖】当前所有数据！\n确定要从项目的 [DB] 目录恢复吗？")) {
+        if(confirm("⚠️ 预警：\n恢复操作将【覆盖】当前所有数据！\n确定要从项目的 [DB] 目录恢复吗？")) {
             $.post('/admin/db/restore', {}, function(res) {
                 if (res.code === 200) {
                     alert("✅ " + res.msg);
@@ -106,6 +117,6 @@
             });
         }
     }
-</script>
+    </script>
 </body>
 </html>

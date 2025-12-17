@@ -67,10 +67,9 @@ def ai_query():
                 {'role': 'system', 'content': DB_SCHEMA_PROMPT},
                 {'role': 'user', 'content': user_input}
             ],
-            temperature=0.1  # 低温度，让 SQL 生成更稳定
+            temperature=0.5  # 低温度，让 SQL 生成更稳定
         )
 
-        # 清洗 AI 返回的数据，防止带有 markdown 符号
         generated_sql = completion.choices[0].message.content
         generated_sql = generated_sql.replace('```sql', '').replace('```', '').strip()
 

@@ -1,22 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-3">
-        <h4 class="text-primary fw-bold"><i class="bi bi-shop"></i> 全部商品分类</h4>
+<div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+        <h4 class="text-primary fw-bold mb-0">
+            <i class="bi bi-grid-fill"></i> 全部商品分类
+        </h4>
     </div>
-    <div class="col-md-9">
-        <form action="/pms/index" method="get">
-            <div class="input-group">
-                <input type="text" name="keyword" class="form-control" placeholder="搜索您想要的商品..." value="{{ curr_kw }}">
-                <button class="btn btn-primary" type="submit">
-                    <i class="bi bi-search"></i> 搜索
-                </button>
-                {% if curr_kw or curr_cid %}
-                <a href="/pms/index" class="btn btn-outline-secondary">重置</a>
-                {% endif %}
-            </div>
-        </form>
+    <div class="col-md-6 text-md-end">
+        <a href="/sms/coupon_center" class="btn btn-danger">
+            <i class="bi bi-gift-fill"></i> 前往领券中心
+        </a>
     </div>
 </div>
 
