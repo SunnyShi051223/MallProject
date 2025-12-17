@@ -37,13 +37,19 @@ DB_SCHEMA_PROMPT = """
    - stock: 库存数量
    - sp_data: 规格描述(如颜色、尺寸)
 )
+3. 订单详情视图 v_order_detail (
+   - id: 订单ID
+   - order_sn: 订单号
+   - member_id: 会员ID
+   - product_name: 商品名称
+   - product_price: 购买价格
+)
 
 【严格规则】：
-1. 只返回 SQL 语句本身，不要返回 markdown 格式（不要 ```sql ... ```），不要任何解释文字。
+1. 只返回 SQL 语句本身，不要返回 markdown 格式。
 2. 总是限制返回行数 (LIMIT 10)。
-3. 如果用户查询“库存”、“规格”或“具体哪一款”，请使用 JOIN 连接 pms_product 和 pms_sku_stock。
-4. 如果用户询问“最贵”、“最便宜”，请使用 ORDER BY price DESC/ASC LIMIT 1。
-5. 绝对禁止生成 INSERT, UPDATE, DELETE, DROP 等修改数据的语句。
+3. 优先使用视图 v_order_detail 来回答关于“订单详情”、“买了什么”等查询。
+4. 绝对禁止生成 INSERT, UPDATE, DELETE, DROP 等修改数据的语句。
 """
 
 
