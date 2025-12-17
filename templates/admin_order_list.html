@@ -7,15 +7,41 @@
             <a href="/admin/" class="list-group-item list-group-item-action">控制台</a>
             <a href="{{ url_for('sys_admin.product_list') }}" class="list-group-item list-group-item-action">商品管理</a>
             <a href="{{ url_for('sys_admin.order_list') }}" class="list-group-item list-group-item-action active bg-dark border-0">订单管理</a>
+            <a href="{{ url_for('sys_admin.coupon_list') }}" class="list-group-item list-group-item-action">营销中心</a>
             <a href="{{ url_for('sys_admin.return_list') }}" class="list-group-item list-group-item-action">售后处理</a>
             <a href="{{ url_for('sys_admin.logout') }}" class="list-group-item list-group-item-action text-danger">退出</a>
         </div>
     </div>
 
     <div class="col-md-10">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body py-3">
+                <form method="get" action="{{ url_for('sys_admin.order_list') }}" class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label for="date" class="col-form-label fw-bold"><i class="bi bi-calendar-date"></i> 销售日报：</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="date" id="date" name="date" class="form-control" value="{{ query_date or '' }}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">查询</button>
+                        {% if query_date %}
+                        <a href="{{ url_for('sys_admin.order_list') }}" class="btn btn-outline-secondary">重置</a>
+                        {% endif %}
+                    </div>
+
+                    {% if query_date %}
+                    <div class="col-auto ms-auto border-start ps-4">
+                        <span class="text-muted">📅 {{ query_date }} 有效成交额：</span>
+                        <span class="text-success fw-bold fs-4">¥ {{ daily_sales }}</span>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
         <div class="card shadow-sm">
             <div class="card-header bg-white">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-receipt"></i> 订单列表</h5>
+                <h5 class="mb-0 fw-bold"><i class="bi bi-list-check"></i> 订单明细</h5>
             </div>
             <div class="card-body p-0">
                 <table class="table table-hover align-middle mb-0">
@@ -53,7 +79,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="6" class="text-center py-5">暂无订单</td></tr>
+                        <tr><td colspan="6" class="text-center py-5 text-muted">暂无订单数据</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

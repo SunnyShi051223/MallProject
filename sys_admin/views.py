@@ -15,7 +15,7 @@ def check_admin_login():
         return redirect(url_for('sys_admin.login'))
 
 
-# --- 基础功能 ---
+# --- 基础功能 (登录/登出/仪表盘) ---
 @sys_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'GET':
@@ -48,7 +48,6 @@ def logout():
 @sys_bp.route('/')
 @sys_bp.route('/dashboard')
 def dashboard():
-    # 仪表盘统计数据
     sales = db.fetch_one("SELECT IFNULL(SUM(total_amount),0) as total FROM oms_order WHERE status > 0")
     today_orders = db.fetch_one("SELECT COUNT(*) as cnt FROM oms_order WHERE DATE(create_time) = CURDATE()")
     low_stock = db.fetch_one("SELECT COUNT(*) as cnt FROM pms_sku_stock WHERE stock < 10")
@@ -133,12 +132,49 @@ def product_delete():
     return jsonify({'code': 200})
 
 
-# --- 🧾 订单管理 ---
+# --- 🧾 订单管理 (🔥 核心修改：增加日期报表逻辑) ---
 @sys_bp.route('/order_list')
 def order_list():
-    sql = "SELECT * FROM oms_order ORDER BY create_time DESC"
-    orders = db.fetch_all(sql)
-    return render_template('admin_order_list.html', orders=orders)
+    query_date = request.args.get('date')
+    daily_sales = 0
+    orders = []
+
+    try:
+        # 1. 构建查询订单的 SQL
+        sql = "SELECT * FROM oms_order"
+        params = []
+
+        if query_date:
+            sql += " WHERE DATE(create_time) = %s"
+            params.append(query_date)
+
+            # 2. 如果选了日期，调用存储过程 p_daily_sales_report 计算销售额
+            conn = db.get_connection()
+            try:
+                with conn.cursor() as cur:
+                    # 调用存储过程: CALL p_daily_sales_report(date, @out)
+                    # args: (输入日期, 0作为占位符)
+                    cur.callproc('p_daily_sales_report', (query_date, 0))
+
+                    # 获取输出参数: SELECT @_p_daily_sales_report_1
+                    cur.execute("SELECT @_p_daily_sales_report_1 as total")
+                    res = cur.fetchone()
+                    if res and res['total']:
+                        daily_sales = res['total']
+            finally:
+                conn.close()
+
+        sql += " ORDER BY create_time DESC"
+        orders = db.fetch_all(sql, tuple(params))
+
+    except Exception as e:
+        print(f"Order List Error: {e}")
+        flash("查询出错", "danger")
+
+    return render_template('admin_order_list.html',
+                           orders=orders,
+                           query_date=query_date,
+                           daily_sales=daily_sales)
 
 
 @sys_bp.route('/order/ship', methods=['POST'])
@@ -148,7 +184,7 @@ def order_ship():
     return jsonify({'code': 200})
 
 
-# --- 🎫 优惠券管理 (新增修复) ---
+# --- 🎫 优惠券管理 ---
 @sys_bp.route('/coupon_list')
 def coupon_list():
     coupons = db.fetch_all("SELECT * FROM sms_coupon ORDER BY id DESC")
@@ -167,7 +203,6 @@ def coupon_add():
     end_time = request.form.get('end_time')
     publish_count = request.form.get('publish_count')
 
-    # enable_status 默认给 1 (启用)
     sql = """
         INSERT INTO sms_coupon (name, amount, min_point, start_time, end_time, publish_count, receive_count, enable_status)
         VALUES (%s, %s, %s, %s, %s, %s, 0, 1)
@@ -220,52 +255,36 @@ def handle_return():
     return redirect(url_for('sys_admin.return_list'))
 
 
-# --- 💾 数据库备份与恢复 (相对路径) ---
+# --- 💾 数据库备份与恢复 ---
 @sys_bp.route('/db/backup', methods=['POST'])
 def db_backup():
-    # 1. 获取当前文件(views.py)的目录 -> sys_admin
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    # 2. 回退一级到根目录，再进入 DB 目录
-    backup_dir = os.path.join(base_dir, '..', 'DB')
-    # 3. 拼接文件名
-    backup_path = os.path.join(backup_dir, 'mall_b2c_backup.sql')
-
-    # 标准化路径分隔符
+    backup_path = os.path.join(base_dir, '..', 'DB', 'mall_b2c_backup.sql')
     backup_path = os.path.normpath(backup_path)
 
-    # 确保 DB 目录存在
-    if not os.path.exists(backup_dir):
-        os.makedirs(backup_dir)
+    if not os.path.exists(os.path.dirname(backup_path)):
+        os.makedirs(os.path.dirname(backup_path))
 
-    # 构建命令
     cmd = f'mysqldump -u root -pshisannian1223 mall_b2c > "{backup_path}"'
 
-    try:
-        if os.system(cmd) == 0:
-            return jsonify({'code': 200, 'msg': f'备份成功！\n文件位置: {backup_path}'})
-        else:
-            return jsonify({'code': 500, 'msg': '备份失败，请检查 mysqldump 环境变量'})
-    except Exception as e:
-        return jsonify({'code': 500, 'msg': str(e)})
+    if os.system(cmd) == 0:
+        return jsonify({'code': 200, 'msg': f'备份成功！\n文件位置: {backup_path}'})
+    else:
+        return jsonify({'code': 500, 'msg': '备份失败，请检查 mysqldump 环境变量'})
 
 
 @sys_bp.route('/db/restore', methods=['POST'])
 def db_restore():
-    # 同样计算相对路径
     base_dir = os.path.dirname(os.path.abspath(__file__))
     backup_path = os.path.join(base_dir, '..', 'DB', 'mall_b2c_backup.sql')
     backup_path = os.path.normpath(backup_path)
 
     if not os.path.exists(backup_path):
-        return jsonify({'code': 400, 'msg': '找不到备份文件，请先执行备份'})
+        return jsonify({'code': 400, 'msg': '找不到备份文件'})
 
-    # 构建命令
     cmd = f'mysql -u root -pshisannian1223 mall_b2c < "{backup_path}"'
 
-    try:
-        if os.system(cmd) == 0:
-            return jsonify({'code': 200, 'msg': '数据库已成功恢复！'})
-        else:
-            return jsonify({'code': 500, 'msg': '恢复失败，可能是 SQL 文件损坏'})
-    except Exception as e:
-        return jsonify({'code': 500, 'msg': str(e)})
+    if os.system(cmd) == 0:
+        return jsonify({'code': 200, 'msg': '数据库已恢复！'})
+    else:
+        return jsonify({'code': 500, 'msg': '恢复失败'})

@@ -73,7 +73,7 @@ def ai_query():
         generated_sql = completion.choices[0].message.content
         generated_sql = generated_sql.replace('```sql', '').replace('```', '').strip()
 
-        # 在后台打印生成的 SQL，方便答辩时展示给老师看
+        # 在后台打印生成的 SQL
         print(f" [AI Generated SQL]: {generated_sql}")
 
         # -----------------------------------

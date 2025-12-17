@@ -169,6 +169,8 @@ def submit_order():
         # 6. 扣库存 & 插入订单项
         for item in cart_items:
             # 扣库存 (乐观锁)
+            #代码并没有先查询库存再在内存中判断（那样会有并发问题），而是直接执行更新语句，并将“库存充足”作为更新条件：
+            #即使有两个请求同时到达数据库，数据库的行锁机制会保证这两条 SQL 串行执行。第二条 SQL 会因为库存不足（不满足 stock >= %s）而更新失败（affected == 0），从而触发回滚
             sql_stock = "UPDATE pms_sku_stock SET stock = stock - %s WHERE id = %s AND stock >= %s"
             with conn.cursor() as cur:
                 affected = cur.execute(sql_stock, (item['quantity'], item['product_sku_id'], item['quantity']))
